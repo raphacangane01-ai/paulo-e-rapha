@@ -11,9 +11,10 @@ const MEU_CASAMENTO_CONFIG = {
   // Data e local do casamento (podem ser editados na tela de Configurações)
   weddingDate: '2028-07-08T17:00:00-03:00',
   weddingLocation: 'Januária, MG',
+  coupleNames: 'Raphaella e Paulo',
 
   // Orçamento máximo padrão (editável na tela de Orçamento)
-  defaultBudgetCap: 20000,
+  defaultBudgetCap: 25000,
 
   // --- Supabase (opcional, ainda não configurado) ---
   // Deixe null para operar 100% offline (localStorage). Quando tiver um

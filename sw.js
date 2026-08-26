@@ -20,6 +20,7 @@ const CORE_ASSETS = [
   './js/modules/gifts.js',
   './js/modules/inspiration.js',
   './js/modules/settings.js',
+  './js/sync.js',
   './assets/icons/icon.svg',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',

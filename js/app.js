@@ -33,11 +33,17 @@ const App = (() => {
     document.getElementById('bottom-nav').innerHTML = navHtml;
   }
 
+  let activeModule = null;
+
   function render() {
+    if (activeModule && typeof activeModule.cleanup === 'function') {
+      activeModule.cleanup();
+    }
     const route = currentRoute();
     const mod = route.module();
     mainEl().innerHTML = mod.render();
     if (mod.afterRender) mod.afterRender();
+    activeModule = mod;
     renderNav();
     window.scrollTo(0, 0);
   }

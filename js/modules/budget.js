@@ -70,10 +70,19 @@ const BudgetModule = (() => {
               ${items.map(b => `<option value="${b.id}">${Utils.escapeHtml(b.category)}</option>`).join('')}
             </select>
           </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="p-installment-toggle" />
+            <span>Parcelar este pagamento</span>
+          </label>
           <div class="form-row">
-            <input type="text" inputmode="decimal" id="p-amount" placeholder="Valor (R$)" required />
+            <input type="text" inputmode="decimal" id="p-amount" placeholder="Valor total (R$)" required />
             <input type="date" id="p-due" />
           </div>
+          <div class="form-row" id="p-installment-fields" style="display:none;">
+            <input type="number" min="1" id="p-installments-count" placeholder="Número de parcelas" />
+            <input type="text" inputmode="decimal" id="p-down-payment" placeholder="Valor da entrada (R$, opcional)" />
+          </div>
+          <p class="muted" id="p-due-hint">Data de vencimento</p>
           <button type="submit" class="btn-primary">Adicionar pagamento</button>
         </form>
         <div id="payments-list">${renderPayments(payments)}</div>
@@ -143,19 +152,69 @@ const BudgetModule = (() => {
       App.rerender();
     });
 
+    const toggleEl = document.getElementById('p-installment-toggle');
+    const fieldsEl = document.getElementById('p-installment-fields');
+    const dueHintEl = document.getElementById('p-due-hint');
+    const dueInput = document.getElementById('p-due');
+
+    toggleEl.addEventListener('change', () => {
+      const on = toggleEl.checked;
+      fieldsEl.style.display = on ? '' : 'none';
+      dueHintEl.textContent = on ? 'Data da entrada (ou da 1ª parcela, se não houver entrada)' : 'Data de vencimento';
+    });
+
     document.getElementById('payment-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const desc = document.getElementById('p-desc').value.trim();
       if (!desc) return;
-      Store.addItem('payments', {
-        description: desc,
-        budgetItemId: document.getElementById('p-budget-item').value || null,
-        amount: Utils.parseCurrencyInput(document.getElementById('p-amount').value),
-        dueDate: document.getElementById('p-due').value || null,
-        status: 'pendente',
-        paidDate: null,
-      });
-      Utils.toast('Pagamento adicionado');
+      const budgetItemId = document.getElementById('p-budget-item').value || null;
+      const totalAmount = Utils.parseCurrencyInput(document.getElementById('p-amount').value);
+      const baseDate = dueInput.value || new Date().toISOString().slice(0, 10);
+
+      if (!toggleEl.checked) {
+        Store.addItem('payments', {
+          description: desc,
+          budgetItemId,
+          amount: totalAmount,
+          dueDate: dueInput.value || null,
+          status: 'pendente',
+          paidDate: null,
+        });
+        Utils.toast('Pagamento adicionado');
+        App.rerender();
+        return;
+      }
+
+      // Parcelamento: gera entrada (opcional) + N parcelas automaticamente
+      const numParcelas = Math.max(1, parseInt(document.getElementById('p-installments-count').value, 10) || 1);
+      const downPayment = Utils.parseCurrencyInput(document.getElementById('p-down-payment').value);
+      const remaining = Math.max(totalAmount - downPayment, 0);
+      const parcelaBase = Math.round((remaining / numParcelas) * 100) / 100;
+      const groupId = Utils.uid();
+      const newPayments = [];
+
+      if (downPayment > 0) {
+        newPayments.push({
+          description: `${desc} - Entrada`,
+          budgetItemId, amount: downPayment, dueDate: baseDate,
+          status: 'pendente', paidDate: null, groupId,
+        });
+      }
+
+      let allocated = 0;
+      for (let i = 1; i <= numParcelas; i++) {
+        const isLast = i === numParcelas;
+        const amount = isLast ? Math.round((remaining - allocated) * 100) / 100 : parcelaBase;
+        allocated += amount;
+        newPayments.push({
+          description: `${desc} - Parcela ${i}/${numParcelas}`,
+          budgetItemId, amount, dueDate: Utils.addMonths(baseDate, i),
+          status: 'pendente', paidDate: null, groupId,
+        });
+      }
+
+      Store.addItems('payments', newPayments);
+      Utils.toast(`${newPayments.length} pagamento(s) gerado(s)`);
       App.rerender();
     });
 

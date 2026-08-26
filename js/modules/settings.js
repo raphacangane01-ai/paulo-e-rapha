@@ -11,6 +11,9 @@ const SettingsModule = (() => {
       </section>
 
       <form id="settings-form" class="card form-card">
+        <label>Nomes do casal
+          <input type="text" id="s-couple" value="${Utils.escapeHtml(settings.coupleNames || '')}" />
+        </label>
         <label>Data e hora do casamento
           <input type="datetime-local" id="s-date" value="${toLocalInputValue(settings.weddingDate)}" />
         </label>
@@ -25,7 +28,7 @@ const SettingsModule = (() => {
 
       <div class="card">
         <div class="card-header"><h2>Backup dos dados</h2></div>
-        <p class="muted">Enquanto a sincronização em nuvem (Supabase) não está configurada, seus dados ficam salvos apenas neste navegador. Exporte um backup regularmente.</p>
+        <p class="muted">Exporte um backup regularmente, especialmente se a sincronização ativa não estiver disponível.</p>
         <div class="form-row">
           <button id="btn-export" class="btn-secondary" type="button">Exportar backup (.json)</button>
           <label class="btn-secondary" style="text-align:center; cursor:pointer;">
@@ -36,10 +39,20 @@ const SettingsModule = (() => {
       </div>
 
       <div class="card">
-        <div class="card-header"><h2>Status da nuvem</h2></div>
-        <p class="muted">${window.MEU_CASAMENTO_CONFIG.supabase.url ? 'Supabase configurado.' : 'Supabase ainda não configurado — funcionando 100% offline neste dispositivo.'}</p>
+        <div class="card-header"><h2>Status de sincronização</h2></div>
+        ${renderSyncStatus()}
       </div>
     `;
+  }
+
+  function renderSyncStatus() {
+    if (window.__MC_SYNC_ACTIVE__) {
+      return `<p class="muted">🟢 Sincronização ativa: qualquer pessoa que abrir este link vê os dados mais recentes.</p>`;
+    }
+    if (window.MCSync && window.MCSync.isHosted()) {
+      return `<p class="muted">🟡 Conectando à sincronização ativa...</p>`;
+    }
+    return `<p class="muted">⚪ Sincronização ativa não disponível neste ambiente — dados salvos apenas neste navegador. ${window.MEU_CASAMENTO_CONFIG.supabase.url ? 'Supabase configurado.' : 'Supabase ainda não configurado.'}</p>`;
   }
 
   function toLocalInputValue(iso) {
@@ -56,6 +69,7 @@ const SettingsModule = (() => {
       const dateVal = document.getElementById('s-date').value;
       Store.update('settings', (s) => ({
         ...s,
+        coupleNames: document.getElementById('s-couple').value.trim(),
         weddingDate: dateVal ? new Date(dateVal).toISOString() : s.weddingDate,
         weddingLocation: document.getElementById('s-location').value.trim(),
         budgetCap: Utils.parseCurrencyInput(document.getElementById('s-budget').value),
@@ -64,8 +78,13 @@ const SettingsModule = (() => {
       App.rerender();
     });
 
-    document.getElementById('btn-export').addEventListener('click', () => {
-      Utils.downloadJSON(`meu-casamento-backup-${new Date().toISOString().slice(0,10)}.json`, Store.exportAll());
+    document.getElementById('btn-export').addEventListener('click', async () => {
+      const filename = `meu-casamento-backup-${new Date().toISOString().slice(0,10)}.json`;
+      const json = JSON.stringify(Store.exportAll(), null, 2);
+      const savedViaCapability = window.MCSync ? await window.MCSync.saveDownload(filename, json) : false;
+      if (!savedViaCapability) {
+        Utils.downloadJSON(filename, Store.exportAll());
+      }
     });
 
     document.getElementById('import-file').addEventListener('change', (e) => {

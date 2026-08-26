@@ -41,6 +41,38 @@ const Utils = (() => {
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   }
 
+  function countdownParts(isoDateTime) {
+    const target = new Date(isoDateTime).getTime();
+    const now = Date.now();
+    let diff = target - now;
+    const past = diff < 0;
+    diff = Math.abs(diff);
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+    const seconds = Math.floor((diff / 1000) % 60);
+    return { days, hours, minutes, seconds, past };
+  }
+
+  function addMonths(isoDate, months) {
+    const d = isoDate ? new Date(isoDate) : new Date();
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + months);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -96,7 +128,8 @@ const Utils = (() => {
 
   return {
     uid, formatCurrency, parseCurrencyInput, formatDate, formatDateTime,
-    daysUntil, escapeHtml, clamp, debounce, downloadJSON, toast,
+    daysUntil, countdownParts, addMonths, fileToDataUrl,
+    escapeHtml, clamp, debounce, downloadJSON, toast,
   };
 })();
 
