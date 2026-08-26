@@ -2,6 +2,19 @@
 // parcelas, vencimentos e alertas de pendências).
 
 const BudgetModule = (() => {
+  let selectedPaymentIds = new Set();
+
+  function monthKey(dateStr) {
+    if (!dateStr) return null;
+    return dateStr.slice(0, 7); // 'YYYY-MM'
+  }
+
+  function monthLabel(key) {
+    const [y, m] = key.split('-').map(Number);
+    const label = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
   function totals() {
     const items = Store.get('budgetItems');
     const payments = Store.get('payments');
@@ -112,29 +125,70 @@ const BudgetModule = (() => {
 
   function renderPayments(payments) {
     if (!payments.length) return `<p class="muted">Nenhum pagamento cadastrado.</p>`;
-    const sorted = [...payments].sort((a, b) => new Date(a.dueDate || '9999-12-31') - new Date(b.dueDate || '9999-12-31'));
-    const today = new Date().setHours(0,0,0,0);
-    return `<ul class="data-list">
-      ${sorted.map(p => {
-        const isOverdue = p.status !== 'pago' && p.dueDate && new Date(p.dueDate).setHours(0,0,0,0) < today;
-        return `
-        <li data-id="${p.id}">
-          <div class="data-list-main">
-            <strong>${Utils.escapeHtml(p.description)}</strong>
-            <span class="muted">${Utils.formatCurrency(p.amount)}</span>
-            ${isOverdue ? '<span class="badge badge-recusado">Atrasado</span>' : ''}
-          </div>
-          <div class="data-list-sub muted">${p.dueDate ? 'Vencimento: ' + Utils.formatDate(p.dueDate) : 'Sem data'} ${p.paidDate ? '· Pago em ' + Utils.formatDate(p.paidDate) : ''}</div>
-          <div class="data-list-actions">
-            <select class="payment-status" data-id="${p.id}">
-              <option value="pendente" ${p.status === 'pendente' ? 'selected' : ''}>Pendente</option>
-              <option value="pago" ${p.status === 'pago' ? 'selected' : ''}>Pago</option>
-            </select>
-            <button class="btn-icon btn-delete-payment" data-id="${p.id}">Remover</button>
-          </div>
-        </li>`;
-      }).join('')}
-    </ul>`;
+    const today = new Date().setHours(0, 0, 0, 0);
+
+    const groups = {};
+    const noDate = [];
+    payments.forEach((p) => {
+      const key = monthKey(p.dueDate);
+      if (!key) { noDate.push(p); return; }
+      (groups[key] = groups[key] || []).push(p);
+    });
+    const sortedKeys = Object.keys(groups).sort();
+
+    const selectedCount = selectedPaymentIds.size;
+    let html = `
+      <div class="bulk-bar${selectedCount ? ' active' : ''}">
+        <span>${selectedCount} selecionado(s)</span>
+        <button type="button" class="btn-secondary" id="btn-clear-selection" ${selectedCount ? '' : 'disabled'}>Limpar seleção</button>
+        <button type="button" class="btn-danger" id="btn-delete-selected" ${selectedCount ? '' : 'disabled'}>Excluir selecionados</button>
+      </div>`;
+
+    sortedKeys.forEach((key) => {
+      const items = groups[key].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+      html += renderPaymentGroup(monthLabel(key), items, today);
+    });
+    if (noDate.length) html += renderPaymentGroup('Sem data definida', noDate, today);
+
+    return html;
+  }
+
+  function renderPaymentGroup(label, items, today) {
+    const groupTotal = items.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    return `
+      <div class="payment-group">
+        <div class="payment-group-header">
+          <span>${Utils.escapeHtml(label)}</span>
+          <span class="muted">${Utils.formatCurrency(groupTotal)}</span>
+        </div>
+        <ul class="data-list">
+          ${items.map((p) => renderPaymentRow(p, today)).join('')}
+        </ul>
+      </div>`;
+  }
+
+  function renderPaymentRow(p, today) {
+    const isOverdue = p.status !== 'pago' && p.dueDate && new Date(p.dueDate).setHours(0, 0, 0, 0) < today;
+    const checked = selectedPaymentIds.has(p.id) ? 'checked' : '';
+    return `
+      <li data-id="${p.id}">
+        <div class="data-list-main">
+          <label class="checkbox-label">
+            <input type="checkbox" class="payment-select" data-id="${p.id}" ${checked} />
+          </label>
+          <strong>${Utils.escapeHtml(p.description)}</strong>
+          <span class="muted">${Utils.formatCurrency(p.amount)}</span>
+          ${isOverdue ? '<span class="badge badge-recusado">Atrasado</span>' : ''}
+        </div>
+        <div class="data-list-sub muted">${p.dueDate ? 'Vencimento: ' + Utils.formatDate(p.dueDate) : 'Sem data'} ${p.paidDate ? '· Pago em ' + Utils.formatDate(p.paidDate) : ''}</div>
+        <div class="data-list-actions">
+          <select class="payment-status" data-id="${p.id}">
+            <option value="pendente" ${p.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+            <option value="pago" ${p.status === 'pago' ? 'selected' : ''}>Pago</option>
+          </select>
+          <button class="btn-icon btn-delete-payment" data-id="${p.id}">Remover</button>
+        </div>
+      </li>`;
   }
 
   function afterRender() {
@@ -225,14 +279,29 @@ const BudgetModule = (() => {
       }
     });
 
-    document.getElementById('payments-list').addEventListener('click', (e) => {
+    const paymentsList = document.getElementById('payments-list');
+
+    paymentsList.addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-delete-payment')) {
         Store.removeItem('payments', e.target.dataset.id);
+        selectedPaymentIds.delete(e.target.dataset.id);
+        App.rerender();
+      }
+      if (e.target.id === 'btn-clear-selection') {
+        selectedPaymentIds.clear();
+        App.rerender();
+      }
+      if (e.target.id === 'btn-delete-selected') {
+        if (!selectedPaymentIds.size) return;
+        const count = selectedPaymentIds.size;
+        Store.update('payments', (list) => list.filter((p) => !selectedPaymentIds.has(p.id)));
+        selectedPaymentIds.clear();
+        Utils.toast(`${count} pagamento(s) removido(s)`);
         App.rerender();
       }
     });
 
-    document.getElementById('payments-list').addEventListener('change', (e) => {
+    paymentsList.addEventListener('change', (e) => {
       if (e.target.classList.contains('payment-status')) {
         const status = e.target.value;
         Store.updateItem('payments', e.target.dataset.id, {
@@ -241,10 +310,20 @@ const BudgetModule = (() => {
         });
         App.rerender();
       }
+      if (e.target.classList.contains('payment-select')) {
+        const id = e.target.dataset.id;
+        if (e.target.checked) selectedPaymentIds.add(id);
+        else selectedPaymentIds.delete(id);
+        App.rerender();
+      }
     });
   }
 
-  return { render, afterRender };
+  function cleanup() {
+    selectedPaymentIds.clear();
+  }
+
+  return { render, afterRender, cleanup };
 })();
 
 window.BudgetModule = BudgetModule;

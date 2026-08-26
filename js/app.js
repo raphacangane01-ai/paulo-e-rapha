@@ -36,11 +36,11 @@ const App = (() => {
   let activeModule = null;
 
   function render() {
-    if (activeModule && typeof activeModule.cleanup === 'function') {
-      activeModule.cleanup();
-    }
     const route = currentRoute();
     const mod = route.module();
+    if (activeModule && activeModule !== mod && typeof activeModule.cleanup === 'function') {
+      activeModule.cleanup();
+    }
     mainEl().innerHTML = mod.render();
     if (mod.afterRender) mod.afterRender();
     activeModule = mod;
