@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>meu-casamento</title>
+  <meta name="description" content="Organize todo o planejamento do seu casamento: convidados, orçamento, fornecedores, cronograma e mais." />
+  <meta name="theme-color" content="#b8748a" />
+
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./assets/icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <aside class="sidebar">
+      <div class="sidebar-brand">💍 meu-casamento</div>
+      <nav id="sidebar-nav"></nav>
+    </aside>
+
+    <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+      <header class="topbar">
+        <button id="menu-toggle" aria-label="Abrir menu">☰</button>
+        <h1>💍 meu-casamento</h1>
+      </header>
+
+      <main class="content" id="main-content">
+        <!-- conteúdo renderizado via JS -->
+      </main>
+    </div>
+
+    <nav class="bottom-nav" id="bottom-nav"></nav>
+  </div>
+
+  <script src="./js/config.js"></script>
+  <script src="./js/utils.js"></script>
+  <script src="./js/store.js"></script>
+  <script src="./js/modules/dashboard.js"></script>
+  <script src="./js/modules/guests.js"></script>
+  <script src="./js/modules/budget.js"></script>
+  <script src="./js/modules/vendors.js"></script>
+  <script src="./js/modules/checklist.js"></script>
+  <script src="./js/modules/timeline.js"></script>
+  <script src="./js/modules/seating.js"></script>
+  <script src="./js/modules/gifts.js"></script>
+  <script src="./js/modules/inspiration.js"></script>
+  <script src="./js/modules/settings.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
