@@ -35,8 +35,13 @@ js/utils.js             funções auxiliares
 js/store.js              camada de dados (localStorage hoje; pronta para Supabase depois)
 js/app.js                 shell + navegação (router)
 js/modules/*.js           um módulo por seção (dashboard, convidados, orçamento, etc.)
+js/sync.js                 sincronização ativa (só funciona na versão publicada como Artifact do Claude; nesta versão para GitHub Pages fica inativo/sem efeito)
 assets/icons/              ícones do PWA
 ```
+
+## Sobre a sincronização ativa
+
+Existe uma versão deste app publicada como Artifact do Claude que sincroniza automaticamente: qualquer pessoa que abra aquele link vê os dados mais recentes, sem precisar de login. Essa sincronização depende de recursos exclusivos do ambiente do Claude e **não funciona** nesta versão hospedada no GitHub Pages — aqui, os dados ficam apenas no navegador de cada pessoa (por isso o Supabase é o caminho recomendado abaixo para ter sincronização real entre dispositivos/pessoas nesta versão).
 
 ## Backup dos dados
 
