@@ -79,7 +79,7 @@ const SettingsModule = (() => {
     });
 
     document.getElementById('btn-export').addEventListener('click', async () => {
-      const filename = `meu-casamento-backup-${new Date().toISOString().slice(0,10)}.json`;
+      const filename = `rapha-e-paulo-backup-${new Date().toISOString().slice(0,10)}.json`;
       const json = JSON.stringify(Store.exportAll(), null, 2);
       const savedViaCapability = window.MCSync ? await window.MCSync.saveDownload(filename, json) : false;
       if (!savedViaCapability) {
