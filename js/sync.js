@@ -11,7 +11,8 @@
 // link do artifact veja a versão mais recente dos dados.
 
 const MCSync = (() => {
-  const SHELL_HTML = `<div class="app-shell">
+  const SHELL_HTML = `<button id="theme-toggle" class="theme-toggle-btn" aria-label="Ativar modo escuro" title="Ativar modo escuro">\u{1F319}</button>
+<div class="app-shell">
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
   <aside class="sidebar">

@@ -3,14 +3,10 @@
 const App = (() => {
   const ROUTES = [
     { hash: '#/', label: 'Início', icon: '🏠', module: () => DashboardModule },
-    { hash: '#/convidados', label: 'Convidados', icon: '👥', module: () => GuestsModule },
     { hash: '#/orcamento', label: 'Orçamento', icon: '💰', module: () => BudgetModule },
     { hash: '#/fornecedores', label: 'Fornecedores', icon: '🤝', module: () => VendorsModule },
     { hash: '#/checklist', label: 'Checklist', icon: '✅', module: () => ChecklistModule },
     { hash: '#/cronograma', label: 'Cronograma', icon: '🗓️', module: () => TimelineModule },
-    { hash: '#/mesas', label: 'Mesas', icon: '🍽️', module: () => SeatingModule },
-    { hash: '#/presentes', label: 'Presentes', icon: '🎁', module: () => GiftsModule },
-    { hash: '#/inspiracoes', label: 'Inspirações', icon: '✨', module: () => InspirationModule },
     { hash: '#/configuracoes', label: 'Configurações', icon: '⚙️', module: () => SettingsModule },
   ];
 
@@ -35,7 +31,13 @@ const App = (() => {
 
   let activeModule = null;
 
-  function render() {
+  // render(isNavigation): troca real de tela (clique no menu, voltar no
+  // navegador) deve subir a página pro topo; uma atualização de dados na
+  // MESMA tela (marcar um quadradinho, salvar um formulário) deve manter a
+  // posição da rolagem onde o usuário estava — por isso a rolagem só é
+  // zerada quando isNavigation é true.
+  function render(isNavigation) {
+    const scrollY = isNavigation ? 0 : window.scrollY;
     const route = currentRoute();
     const mod = route.module();
     if (activeModule && activeModule !== mod && typeof activeModule.cleanup === 'function') {
@@ -45,22 +47,23 @@ const App = (() => {
     if (mod.afterRender) mod.afterRender();
     activeModule = mod;
     renderNav();
-    window.scrollTo(0, 0);
+    document.body.classList.remove('sidebar-open');
+    window.scrollTo(0, scrollY);
   }
 
   function rerender() {
-    render();
+    render(false);
   }
 
   function init() {
-    window.addEventListener('hashchange', render);
+    window.addEventListener('hashchange', () => render(true));
     document.getElementById('menu-toggle')?.addEventListener('click', () => {
       document.body.classList.toggle('sidebar-open');
     });
     document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
       document.body.classList.remove('sidebar-open');
     });
-    render();
+    render(true);
   }
 
   return { init, rerender, ROUTES };
