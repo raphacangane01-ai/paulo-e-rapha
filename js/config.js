@@ -5,7 +5,7 @@
 // para injetar via ambiente de build/hospedagem).
 
 const MEU_CASAMENTO_CONFIG = {
-  appName: 'meu-casamento',
+  appName: 'Rapha & Paulo',
   version: '1.0.0',
 
   // Data e local do casamento (podem ser editados na tela de Configurações)

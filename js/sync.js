@@ -16,14 +16,14 @@ const MCSync = (() => {
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
   <aside class="sidebar">
-    <div class="sidebar-brand">\u{1F48D} meu-casamento</div>
+    <div class="sidebar-brand">\u{1F48D} Rapha & Paulo</div>
     <nav id="sidebar-nav"></nav>
   </aside>
 
   <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
     <header class="topbar">
       <button id="menu-toggle" aria-label="Abrir menu">☰</button>
-      <h1>\u{1F48D} meu-casamento</h1>
+      <h1>\u{1F48D} Rapha & Paulo</h1>
     </header>
 
     <main class="content" id="main-content">
@@ -95,7 +95,7 @@ const MCSync = (() => {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>meu-casamento</title>
+<title>Rapha & Paulo</title>
 <meta name="theme-color" content="#a9647e" />
 <style id="app-style">${cssText}</style>
 </head>
