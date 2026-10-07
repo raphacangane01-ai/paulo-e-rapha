@@ -102,6 +102,7 @@ button, input, select, textarea {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
+  padding-right: 62px; /* reserva espaço para o botão flutuante de tema */
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -112,6 +113,10 @@ button, input, select, textarea {
   font-weight: 600;
   margin: 0;
   color: var(--primary-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 #menu-toggle {
@@ -120,9 +125,35 @@ button, input, select, textarea {
   font-size: 1.4rem;
   cursor: pointer;
   display: none;
-  padding: 4px 8px;
+  padding: 8px 10px;
+  min-width: 44px;
+  min-height: 44px;
+  flex: 0 0 auto;
   color: var(--text);
 }
+
+/* Botão flutuante de modo escuro/claro — sempre no canto superior direito */
+.theme-toggle-btn {
+  position: fixed;
+  top: 10px;
+  right: 12px;
+  z-index: 70;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.theme-toggle-btn:hover { background: var(--surface-alt); }
 
 /* Sidebar (desktop) */
 .sidebar {
@@ -151,7 +182,8 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 12px;
+  min-height: 44px;
   border-radius: 10px;
   text-decoration: none;
   color: var(--text);
@@ -168,41 +200,16 @@ button, input, select, textarea {
 main.content {
   flex: 1;
   padding: 16px;
-  padding-bottom: calc(var(--nav-height) + 24px);
+  padding-bottom: 32px;
   max-width: 900px;
   margin: 0 auto;
   width: 100%;
 }
 
-/* Bottom nav (mobile) */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--nav-height);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  display: flex;
-  overflow-x: auto;
-  z-index: 20;
-}
-
-.bottom-nav .nav-item {
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.7rem;
-  border-radius: 0;
-  padding: 8px 14px;
-  white-space: nowrap;
-}
-
-.bottom-nav .nav-item.active {
-  background: none;
-  color: var(--primary-strong);
-  font-weight: 600;
-}
+/* Bottom nav: substituída pela gaveta lateral (hamburger) no celular — com
+   10 destinos, uma barra inferior ficava cortada/rolável e confusa. O
+   markup continua sendo preenchido pelo JS, só fica oculto visualmente. */
+.bottom-nav { display: none; }
 
 .sidebar-backdrop {
   display: none;
@@ -282,6 +289,7 @@ main.content {
   font-size: 1.7rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .stat-label { font-size: 0.78rem; opacity: 0.85; margin-top: 3px; letter-spacing: 0.02em; }
 
@@ -416,7 +424,8 @@ label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: 
   color: var(--danger);
   cursor: pointer;
   font-size: 0.8rem;
-  padding: 4px 8px;
+  padding: 10px 8px;
+  min-height: 40px;
 }
 
 .data-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -465,9 +474,17 @@ label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: 
   font-size: 0.9rem;
 }
 .alert-danger { background: var(--danger-bg); color: var(--danger); }
+.alert-warning { background: var(--warning-bg); color: var(--warning-text); }
 
-.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.checkbox-label { display: flex; flex-direction: row; align-items: center; gap: 10px; cursor: pointer; min-height: 44px; }
 .checkbox-label input { width: auto; }
+.checkbox-label input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
 
 .inspiration-card {
   background: var(--surface);
@@ -516,6 +533,8 @@ label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: 
   .sidebar {
     position: fixed;
     left: 0; top: 0; bottom: 0;
+    width: min(var(--sidebar-width), 82vw);
+    max-width: 82vw;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     z-index: 40;
@@ -531,6 +550,23 @@ label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: 
   body.sidebar-open .sidebar { transform: translateX(0); }
   body.sidebar-open .sidebar-backdrop { display: block; }
 }
+
+/* Telas muito estreitas (celulares pequenos) */
+@media (max-width: 380px) {
+  .countdown-grid { gap: 4px; }
+  .countdown-number { font-size: 1.4rem; }
+  .countdown-caption { font-size: 0.6rem; }
+  .stat-value { font-size: 1.3rem; word-break: break-word; }
+  main.content { padding: 12px; }
+}
+
+.inspiration-attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 6px;
+  margin: 4px 0;
+}
+.inspiration-attachments .inspiration-thumb { max-height: 110px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
