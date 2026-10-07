@@ -1,6 +1,6 @@
-# meu-casamento
+# Rapha & Paulo
 
-Aplicativo de planejamento de casamento — convidados, orçamento e pagamentos, fornecedores/contratos, checklist, cronograma, mesas, presentes e inspirações. Funciona 100% offline (PWA instalável), com os dados salvos no navegador.
+Aplicativo de planejamento de casamento — orçamento e pagamentos, fornecedores/contratos e checklist. Funciona 100% offline (PWA instalável), com os dados salvos no navegador.
 
 Este é um projeto novo, construído do zero, sem nenhum código reaproveitado de projetos anteriores.
 
@@ -34,7 +34,7 @@ js/config.js           configurações e placeholders (ex: Supabase)
 js/utils.js             funções auxiliares
 js/store.js              camada de dados (localStorage hoje; pronta para Supabase depois)
 js/app.js                 shell + navegação (router)
-js/modules/*.js           um módulo por seção (dashboard, convidados, orçamento, etc.)
+js/modules/*.js           um módulo por seção (dashboard, orçamento, fornecedores, checklist, configurações)
 js/sync.js                 sincronização ativa (só funciona na versão publicada como Artifact do Claude; nesta versão para GitHub Pages fica inativo/sem efeito)
 assets/icons/              ícones do PWA
 ```
