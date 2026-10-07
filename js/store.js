@@ -19,18 +19,23 @@ const Store = (() => {
   const STORAGE_KEY = 'meuCasamentoData_v1';
 
   const CHECKLIST_CATEGORIES = [
-    'Cerimonial', 'Cerimônia', 'Recepção', 'Música', 'Festa', 'Alimentação',
+    'Cerimônia', 'Recepção', 'Música', 'Festa', 'Alimentação',
     'Decoração', 'Lembrancinhas', 'Beleza do Noivo', 'Beleza da Noiva',
     'Vestuário', 'Padrinhos', 'Madrinhas', 'Dama de Honra', 'Mãe da Noiva',
     'Mãe do Noivo', 'Pai da Noiva', 'Avós', 'Documentação/Cartório',
-    'Convites', 'Fotografia e Vídeo', 'Outros',
+    'Convites', 'Fotografia e Vídeo',
+    'Bella Vista', 'Janeiro', 'Semana do casamento', 'Dia do casamento',
+    'Outros',
   ];
 
   const SEED_CHECKLIST_TITLES = {
-    'Cerimonial': ['Pesquisar e contratar cerimonialista', 'Alinhar roteiro da cerimônia com o cerimonial', 'Confirmar horários com o cerimonial na semana do evento'],
-    'Cerimônia': ['Escolher leituras/votos da cerimônia religiosa', 'Providenciar documentação para o cartório'],
+    'Cerimônia': [
+      'Escolher leituras/votos da cerimônia religiosa',
+      'Providenciar documentação para o cartório',
+      'Montar o roteiro da cerimônia e combinar com a madrinha responsável por conduzi-lo',
+    ],
     'Recepção': ['Definir layout da recepção', 'Confirmar horário de início e fim (17h às 0h/2h)', 'Combinar montagem e desmontagem do espaço'],
-    'Música': ['Pesquisar e contratar banda ou DJ', 'Montar playlist para os momentos-chave'],
+    'Música': ['Pesquisar e contratar banda ou DJ', 'Montar playlist no Spotify para a cerimônia e o início da recepção'],
     'Festa': ['Definir cronograma da festa', 'Combinar horário de brinde/discursos'],
     'Alimentação': ['Fechar cardápio do buffet (salgados/entradas)', 'Definir jantar simples', 'Definir lanche da madrugada', 'Marcar degustação com o buffet'],
     'Decoração': ['Contratar decoração', 'Definir paleta de cores e estilo'],
@@ -48,7 +53,36 @@ const Store = (() => {
     'Documentação/Cartório': ['Reunir documentos para o registro civil', 'Agendar data no cartório', 'Solicitar certidão após o casamento'],
     'Convites': ['Definir modelo do convite digital', 'Enviar convites digitais aos convidados', 'Providenciar convite físico só para os padrinhos'],
     'Fotografia e Vídeo': ['Contratar fotógrafo', 'Alinhar lista de fotos essenciais'],
-    'Outros': ['Revisar lista de convidados final', 'Confirmar fornecedores na semana do evento'],
+    'Bella Vista': [
+      'Confirmar cardápio final (alimentação + bebidas) com a Choperia Bella Vista',
+      'Confirmar número final de convidados para o espaço',
+      'Alinhar horário de montagem e do evento com a Bella Vista',
+      'Confirmar forma de pagamento na noite do evento',
+    ],
+    'Janeiro': [
+      'Quitar fornecedores contratados (exceto Bella Vista) até 25/01/2027',
+      'Última prova dos trajes',
+      'Confirmar lista final de convidados e enviar para os fornecedores',
+      'Revisar cronograma do dia do casamento com os fornecedores',
+    ],
+    'Semana do casamento': [
+      'Confirmar horários de entrega/montagem de todos os fornecedores',
+      'Confirmar cabelo e maquiagem (horário e local)',
+      'Buscar/retirar traje e acessórios',
+      'Separar documentos para o cartório',
+      'Fazer reserva final com a Bella Vista (número de convidados e cardápio)',
+    ],
+    'Dia do casamento': [
+      'Levar documentos para o cartório/cerimônia',
+      'Confirmar chegada do storymaker e da fotógrafa (Mariana)',
+      'Confirmar chegada da banda (BAIANO)',
+      'Pagamento da Bella Vista no local',
+      'Momento da entrada e votos',
+    ],
+    // Sem itens fixos: o módulo de Convidados foi removido do app, então os
+    // itens genéricos que viviam aqui não se aplicam mais. Fica como
+    // categoria livre para tarefas que não se encaixem nas demais.
+    'Outros': [],
   };
 
   function buildSeedChecklist() {
@@ -76,6 +110,7 @@ const Store = (() => {
       vendors: [],         // { id, name, category, contact, status, contractNotes }
       checklist: buildSeedChecklist(), // { id, title, dueDate, done, category }
       timeline: [],        // { id, time, title, notes, day: 'planning' | 'event' }
+      incomeSchedule: [],  // { id, month: 'YYYY-MM', source, amount } — entradas de dinheiro previstas (referência, não são pagamentos)
       tables: [],          // { id, name, capacity, guestIds: [] }
       gifts: [],           // { id, name, estimatedValue, link, status, givenBy }
       inspirations: [],    // { id, title, url, notes, category, file: {name, type, dataUrl} | null }
