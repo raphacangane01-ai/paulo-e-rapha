@@ -64,9 +64,48 @@ const MCSync = (() => {
     }
   }
 
-  const schedulePublish = Utils.debounce((data) => {
-    doPublish(data);
-  }, 1200);
+  // Importante: só pode haver UMA publicação em andamento por vez. Cada
+  // publish() bem-sucedido recarrega esta própria aba — então se uma 2ª
+  // edição (ex: marcar outro item do checklist) disparasse uma 2ª
+  // publicação enquanto a 1ª ainda está em andamento, a aba podia recarregar
+  // para a versão da 1ª publicação bem no meio da 2ª edição — fazendo
+  // parecer que "a página atualiza sozinha e desmarca a tarefa que acabei
+  // de marcar". Por isso, em vez de só "debounce", mantemos uma fila de
+  // profundidade 1: enquanto uma publicação está em andamento, qualquer
+  // mudança nova só é publicada depois que a atual terminar (sempre com os
+  // dados mais recentes).
+  //
+  // O debounce em si é bem curto (250ms, só o suficiente pra juntar
+  // cliques praticamente simultâneos) — o resto da demora de sincronizar
+  // vinha do próprio tamanho do documento publicado (chegou a ~15,6MB por
+  // causa de fotos antigas de inspirações, já removidas do que é
+  // publicado — ver build_data_patch.py/Store), não do debounce.
+  let publishInFlight = false;
+  let pendingData = null;
+  let debounceTimer = null;
+
+  function schedulePublish(data) {
+    pendingData = data;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      runPublish();
+    }, 250);
+  }
+
+  async function runPublish() {
+    if (publishInFlight) return; // já tem uma publicação rodando; ela mesma dispara a próxima ao terminar
+    if (!pendingData) return;
+    const data = pendingData;
+    pendingData = null;
+    publishInFlight = true;
+    try {
+      await doPublish(data);
+    } finally {
+      publishInFlight = false;
+      if (pendingData) runPublish(); // chegou mudança nova durante a publicação: publica a mais recente agora
+    }
+  }
 
   async function doPublish(data) {
     if (!ready || !artifactApi) return;

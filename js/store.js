@@ -114,6 +114,10 @@ const Store = (() => {
       tables: [],          // { id, name, capacity, guestIds: [] }
       gifts: [],           // { id, name, estimatedValue, link, status, givenBy }
       inspirations: [],    // { id, title, url, notes, category, file: {name, type, dataUrl} | null }
+      // uiState.lastRoute: usado só para o app voltar pra tela certa depois
+      // de uma recarga automática (ver sync.js/app.js) — não é um dado do
+      // casamento, por isso fica de fora do que é mostrado/editado nas telas.
+      uiState: { lastRoute: null },
     };
   }
 
@@ -210,9 +214,27 @@ const Store = (() => {
     persist();
   }
 
+  // setLastRoute: guarda em qual tela a pessoa está, SEM disparar persist()
+  // (não gera uma republicação só por causa de navegação). Como "data" é o
+  // mesmo objeto que é lido no momento em que a próxima publicação de fato
+  // acontece (ver sync.js, que é "debounced"), essa tela acaba embutida
+  // automaticamente na próxima vez que algo for salvo — e é esse valor
+  // embutido no próprio documento publicado (não o localStorage, que pode
+  // não sobreviver à recarga para a nova versão) que o app usa pra voltar
+  // pra tela certa depois de marcar/alterar algo. Ver app.js.
+  function setLastRoute(hash) {
+    if (!data.uiState) data.uiState = {};
+    data.uiState.lastRoute = (!hash || hash === '#/') ? null : hash;
+  }
+
+  function getLastRoute() {
+    return data.uiState ? data.uiState.lastRoute : null;
+  }
+
   return {
     get, set, update, addItem, addItems, updateItem, removeItem,
     subscribe, exportAll, importAll, resetAll,
+    setLastRoute, getLastRoute,
     CHECKLIST_CATEGORIES,
   };
 })();

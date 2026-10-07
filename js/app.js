@@ -30,12 +30,18 @@ const App = (() => {
 
   let activeModule = null;
 
-  // Guarda a tela atual (com hora) pra se recuperar de uma recarga que a
-  // gente não pediu — ver NAV_STATE_KEY abaixo.
+  // Guarda a tela atual pra se recuperar de uma recarga que a gente não
+  // pediu (ver comentário grande mais abaixo). Duas cópias, por segurança:
+  // 1) no próprio objeto de dados do Store — essa é a que realmente importa,
+  //    porque viaja embutida no HTML republicado (sobrevive à troca de
+  //    versão); 2) no localStorage, como reforço para quando a troca de
+  //    tela acontece sem passar por uma recarga de verdade.
   const NAV_STATE_KEY = 'meuCasamentoNavState_v1';
   function saveNavState() {
+    const hash = currentRoute().hash;
+    try { Store.setLastRoute(hash); } catch (e) { /* Store ainda não carregado: ignora */ }
     try {
-      localStorage.setItem(NAV_STATE_KEY, JSON.stringify({ hash: currentRoute().hash, ts: Date.now() }));
+      localStorage.setItem(NAV_STATE_KEY, JSON.stringify({ hash, ts: Date.now() }));
     } catch (e) { /* localStorage indisponível: sem problema, é só uma conveniência */ }
   }
 
@@ -89,6 +95,27 @@ const App = (() => {
     }
   }
 
+  // Mesma ideia de restoreRecentNavIfReload(), mas usando o dado que veio
+  // embutido NESTE MESMO carregamento da página (Store.getLastRoute()) em
+  // vez do localStorage. É essa a que realmente resolve o problema: quando
+  // o Artifact recarrega a aba para uma versão nova, pode ser uma aba
+  // "nova" por dentro (dependendo de como o ambiente isola a página), e o
+  // localStorage de antes nem sempre sobrevive — mas o HTML republicado
+  // sempre carrega com os dados mais recentes, e a última tela visitada
+  // está junto deles (ver Store.setLastRoute). Por isso ela é checada
+  // primeiro; o localStorage fica como reforço.
+  function restoreLastRouteIfReload() {
+    const hash = window.location.hash;
+    if (hash && hash !== '#/') return false; // já tem uma tela explícita na URL
+    let lastRoute = null;
+    try { lastRoute = Store.getLastRoute(); } catch (e) { lastRoute = null; }
+    if (lastRoute && ROUTES.some((r) => r.hash === lastRoute)) {
+      window.location.hash = lastRoute;
+      return true;
+    }
+    return restoreRecentNavIfReload();
+  }
+
   function init() {
     window.addEventListener('hashchange', () => render(true));
     document.getElementById('menu-toggle')?.addEventListener('click', () => {
@@ -97,9 +124,9 @@ const App = (() => {
     document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
       document.body.classList.remove('sidebar-open');
     });
-    // Se restoreRecentNavIfReload() mudar o hash, o próprio evento
+    // Se restoreLastRouteIfReload() mudar o hash, o próprio evento
     // "hashchange" já dispara o render(true) — não precisa renderizar de novo aqui.
-    if (!restoreRecentNavIfReload()) {
+    if (!restoreLastRouteIfReload()) {
       render(true);
     }
   }
