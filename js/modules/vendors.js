@@ -3,6 +3,14 @@
 const VendorsModule = (() => {
   const CATEGORIES = ['Cerimonial', 'Fotografia', 'Cabelo e Maquiagem', 'Trajes', 'Banda/DJ', 'Decoração', 'Buffet', 'Flores', 'Outro'];
 
+  const STATUS_OPTIONS = [
+    { value: 'pendente', label: 'Pendente' },
+    { value: 'a_confirmar', label: 'A confirmar' },
+    { value: 'contratado', label: 'Contratado' },
+    { value: 'pagamento_no_evento', label: 'Pagamento no evento' },
+    { value: 'pago', label: 'Pago' },
+  ];
+
   function render() {
     const vendors = Store.get('vendors');
     return `
@@ -21,9 +29,7 @@ const VendorsModule = (() => {
         <div class="form-row">
           <input type="text" id="v-contact" placeholder="Contato" />
           <select id="v-status">
-            <option value="pesquisando">Pesquisando</option>
-            <option value="orçamento">Orçamento recebido</option>
-            <option value="contratado">Contratado</option>
+            ${STATUS_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join('')}
           </select>
         </div>
         <textarea id="v-contract" placeholder="Notas do contrato (datas, condições, cláusulas importantes...)"></textarea>
@@ -31,6 +37,10 @@ const VendorsModule = (() => {
       </form>
 
       <div class="card">
+        <div class="card-header">
+          <h2>Fornecedores cadastrados</h2>
+          <button type="button" class="btn-secondary" id="btn-export-vendors">⬇️ Exportar (CSV)</button>
+        </div>
         <div id="vendor-list">${renderList(vendors)}</div>
       </div>
     `;
@@ -50,9 +60,7 @@ const VendorsModule = (() => {
           ${v.contractNotes ? `<div class="data-list-sub">${Utils.escapeHtml(v.contractNotes)}</div>` : ''}
           <div class="data-list-actions">
             <select class="vendor-status" data-id="${v.id}">
-              <option value="pesquisando" ${v.status === 'pesquisando' ? 'selected' : ''}>Pesquisando</option>
-              <option value="orçamento" ${v.status === 'orçamento' ? 'selected' : ''}>Orçamento recebido</option>
-              <option value="contratado" ${v.status === 'contratado' ? 'selected' : ''}>Contratado</option>
+              ${STATUS_OPTIONS.map(o => `<option value="${o.value}" ${v.status === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
             </select>
             <button class="btn-icon btn-delete" data-id="${v.id}">Remover</button>
           </div>
@@ -61,10 +69,24 @@ const VendorsModule = (() => {
   }
 
   function labelStatus(s) {
-    return { pesquisando: 'Pesquisando', orçamento: 'Orçamento recebido', contratado: 'Contratado' }[s] || s;
+    const found = STATUS_OPTIONS.find(o => o.value === s);
+    return found ? found.label : (s || 'Pendente');
   }
   function statusClass(s) {
-    return { pesquisando: 'pendente', orçamento: 'pendente', contratado: 'confirmado' }[s] || 'pendente';
+    return {
+      pendente: 'pendente',
+      a_confirmar: 'pendente',
+      contratado: 'confirmado',
+      pagamento_no_evento: 'confirmado',
+      pago: 'confirmado',
+    }[s] || 'pendente';
+  }
+
+  function exportVendorsCsv(vendors) {
+    const headers = ['Nome', 'Categoria', 'Contato', 'Status', 'Notas do contrato'];
+    const rows = vendors.map((v) => [v.name, v.category, v.contact || '', labelStatus(v.status), v.contractNotes || '']);
+    Utils.downloadCSV('fornecedores.csv', headers, rows);
+    Utils.toast(`Exportando ${vendors.length} fornecedor(es)`);
   }
 
   function afterRender() {
@@ -95,6 +117,10 @@ const VendorsModule = (() => {
         Store.removeItem('vendors', e.target.dataset.id);
         App.rerender();
       }
+    });
+
+    document.getElementById('btn-export-vendors').addEventListener('click', () => {
+      exportVendorsCsv(Store.get('vendors'));
     });
   }
 

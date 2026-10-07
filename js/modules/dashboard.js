@@ -14,7 +14,7 @@ const DashboardModule = (() => {
     const pending = payments.filter(p => p.status !== 'pago').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const cap = Number(settings.budgetCap) || 0;
 
-    return { planned, paid, pending, cap, remaining: cap - paid };
+    return { planned, paid, pending, cap, remaining: cap - planned };
   }
 
   function upcomingPayments() {
@@ -27,12 +27,63 @@ const DashboardModule = (() => {
     return items.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
   }
 
+  // "O que falta" — junta pagamentos pendentes, tarefas do checklist e
+  // fornecedores ainda não contratados/confirmados numa única lista,
+  // organizada em 5 níveis de prioridade com base no prazo (não em algo
+  // marcado manualmente, pra não depender de dado que não temos).
+  const PRIORITY_LABELS = ['Atrasado', 'Esta semana', 'Este mês', 'Até o casamento', 'Sem prazo definido'];
+
+  function priorityTier(dueDate) {
+    if (!dueDate) return 4; // sem prazo definido
+    const days = Utils.daysUntil(dueDate);
+    if (days < 0) return 0; // atrasado
+    if (days <= 7) return 1; // esta semana
+    if (days <= 30) return 2; // este mês
+    return 3; // até o casamento
+  }
+
+  function computeWhatsMissing() {
+    const payments = Store.get('payments').filter(p => p.status !== 'pago');
+    const checklist = Store.get('checklist').filter(c => !c.done);
+    const vendors = Store.get('vendors').filter(v => v.status === 'pendente' || v.status === 'a_confirmar');
+
+    const rows = [];
+    payments.forEach(p => rows.push({ tier: priorityTier(p.dueDate), label: p.description, type: 'Pagamento', dueDate: p.dueDate }));
+    checklist.forEach(c => rows.push({ tier: priorityTier(c.dueDate), label: c.title, type: 'Tarefa', dueDate: c.dueDate }));
+    vendors.forEach(v => rows.push({ tier: 4, label: `${v.name} (${v.category})`, type: 'Fornecedor', dueDate: null }));
+
+    const byTier = [[], [], [], [], []];
+    rows.forEach(r => byTier[r.tier].push(r));
+    byTier.forEach(list => list.sort((a, b) => new Date(a.dueDate || '9999-12-31') - new Date(b.dueDate || '9999-12-31')));
+    return byTier;
+  }
+
+  function renderWhatsMissing() {
+    const byTier = computeWhatsMissing();
+    const total = byTier.reduce((s, l) => s + l.length, 0);
+    if (!total) return `<p class="muted">Nada pendente no momento 🎉</p>`;
+    return byTier.map((list, tier) => {
+      if (!list.length) return '';
+      return `
+        <div style="margin-bottom:10px;">
+          <div class="muted" style="font-weight:600; margin-bottom:4px;">${PRIORITY_LABELS[tier]} (${list.length})</div>
+          <ul class="simple-list">
+            ${list.map(r => `
+              <li>
+                <span>${Utils.escapeHtml(r.label)} <span class="tag">${r.type}</span></span>
+                <span class="muted">${r.dueDate ? Utils.formatDate(r.dueDate) : ''}</span>
+              </li>`).join('')}
+          </ul>
+        </div>`;
+    }).join('');
+  }
+
   function render() {
     const settings = Store.get('settings');
-    const guests = Store.get('guests');
     const vendors = Store.get('vendors');
+    const checklist = Store.get('checklist');
+    const pendingTasks = checklist.filter(c => !c.done).length;
     const budget = computeBudgetSummary();
-    const confirmed = guests.filter(g => g.rsvp === 'confirmado').length;
     const pctPaid = budget.cap > 0 ? Utils.clamp((budget.paid / budget.cap) * 100, 0, 100) : 0;
     const dateLabel = settings.weddingDate ? Utils.formatDateTime(settings.weddingDate) : 'data a definir';
 
@@ -48,12 +99,12 @@ const DashboardModule = (() => {
 
       <div class="card-grid">
         <div class="stat-card">
-          <div class="stat-value">${confirmed}/${guests.length}</div>
-          <div class="stat-label">convidados confirmados</div>
-        </div>
-        <div class="stat-card">
           <div class="stat-value">${vendors.length}</div>
           <div class="stat-label">fornecedores cadastrados</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${pendingTasks}</div>
+          <div class="stat-label">tarefas pendentes</div>
         </div>
       </div>
 
@@ -68,7 +119,7 @@ const DashboardModule = (() => {
         <div class="budget-mini-grid">
           <div><span class="muted">Pago</span><br><strong>${Utils.formatCurrency(budget.paid)}</strong></div>
           <div><span class="muted">Pendente</span><br><strong>${Utils.formatCurrency(budget.pending)}</strong></div>
-          <div><span class="muted">Restante do teto</span><br><strong class="${budget.remaining < 0 ? 'text-danger' : ''}">${Utils.formatCurrency(budget.remaining)}</strong></div>
+          <div><span class="muted">Orçamento disponível</span><br><strong class="${budget.remaining < 0 ? 'text-danger' : ''}">${Utils.formatCurrency(budget.remaining)}</strong></div>
         </div>
       </div>
 
@@ -81,6 +132,11 @@ const DashboardModule = (() => {
           <div class="card-header"><h2>Próximas tarefas</h2></div>
           ${renderUpcomingChecklist()}
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>O que falta</h2></div>
+        ${renderWhatsMissing()}
       </div>
     `;
   }

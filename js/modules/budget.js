@@ -3,6 +3,7 @@
 
 const BudgetModule = (() => {
   let selectedPaymentIds = new Set();
+  let filters = { vendorId: '', category: '', status: '', month: '', minValue: '', maxValue: '' };
 
   function monthKey(dateStr) {
     if (!dateStr) return null;
@@ -30,12 +31,59 @@ const BudgetModule = (() => {
     return Store.get('payments').filter(p => p.status !== 'pago' && p.dueDate && new Date(p.dueDate).setHours(0,0,0,0) < today);
   }
 
+  function dueSoonPayments(days = 14) {
+    const today = new Date().setHours(0,0,0,0);
+    const limit = today + days * 24 * 60 * 60 * 1000;
+    return Store.get('payments').filter(p => {
+      if (p.status === 'pago' || !p.dueDate) return false;
+      const d = new Date(p.dueDate).setHours(0,0,0,0);
+      return d >= today && d <= limit;
+    });
+  }
+
+  function applyFilters(payments, items, vendors) {
+    return payments.filter((p) => {
+      const item = items.find((b) => b.id === p.budgetItemId);
+      const vendorId = item ? item.vendorId : null;
+      if (filters.vendorId && vendorId !== filters.vendorId) return false;
+      if (filters.category && (!item || item.category !== filters.category)) return false;
+      if (filters.status && p.status !== filters.status) return false;
+      if (filters.month && monthKey(p.dueDate) !== filters.month) return false;
+      const amount = Number(p.amount) || 0;
+      if (filters.minValue && amount < Number(filters.minValue)) return false;
+      if (filters.maxValue && amount > Number(filters.maxValue)) return false;
+      return true;
+    });
+  }
+
+  function exportPaymentsCsv(payments, items, vendors) {
+    const headers = ['Descrição', 'Categoria', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Data de pagamento'];
+    const rows = payments.map((p) => {
+      const item = items.find((b) => b.id === p.budgetItemId);
+      const vendor = item ? vendors.find((v) => v.id === item.vendorId) : null;
+      return [
+        p.description,
+        item ? item.category : '',
+        vendor ? vendor.name : '',
+        Utils.formatCurrency(p.amount),
+        p.dueDate ? Utils.formatDate(p.dueDate) : '',
+        p.status === 'pago' ? 'Pago' : 'Pendente',
+        p.paidDate ? Utils.formatDate(p.paidDate) : '',
+      ];
+    });
+    Utils.downloadCSV('pagamentos.csv', headers, rows);
+    Utils.toast(`Exportando ${payments.length} pagamento(s)`);
+  }
+
   function render() {
     const items = Store.get('budgetItems');
     const vendors = Store.get('vendors');
     const payments = Store.get('payments');
+    const income = Store.get('incomeSchedule');
     const t = totals();
     const overdue = overduePayments();
+    const dueSoon = dueSoonPayments();
+    const filtered = applyFilters(payments, items, vendors);
 
     return `
       <section class="view-header">
@@ -47,11 +95,32 @@ const BudgetModule = (() => {
         <div class="alert alert-danger">
           ⚠️ ${overdue.length} pagamento(s) atrasado(s): ${overdue.map(p => Utils.escapeHtml(p.description)).join(', ')}
         </div>` : ''}
+      ${dueSoon.length ? `
+        <div class="alert alert-warning">
+          ⏰ ${dueSoon.length} pagamento(s) vencendo nos próximos 14 dias: ${dueSoon.map(p => Utils.escapeHtml(p.description)).join(', ')}
+        </div>` : ''}
 
       <div class="card-grid">
+        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(t.planned)}</div><div class="stat-label">Total planejado</div></div>
         <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(t.paid)}</div><div class="stat-label">Pago</div></div>
         <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(t.pending)}</div><div class="stat-label">Pendente</div></div>
-        <div class="stat-card ${t.cap - t.paid < 0 ? 'stat-danger' : ''}"><div class="stat-value">${Utils.formatCurrency(t.cap - t.paid)}</div><div class="stat-label">Restante do teto</div></div>
+        <div class="stat-card ${t.cap - t.planned < 0 ? 'stat-danger' : ''}"><div class="stat-value">${Utils.formatCurrency(t.cap - t.planned)}</div><div class="stat-label">Orçamento disponível (teto − planejado)</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Entradas de dinheiro previstas</h2></div>
+        <p class="muted">Só uma referência de quando o dinheiro deve estar disponível, não é um pagamento.</p>
+        <form id="income-form" class="form-card">
+          <div class="form-row">
+            <input type="month" id="inc-month" required />
+            <input type="text" id="inc-source" placeholder="Origem (ex: 13º salário)" required />
+          </div>
+          <div class="form-row">
+            <input type="text" inputmode="decimal" id="inc-amount" placeholder="Valor (R$)" required />
+            <button type="submit" class="btn-primary">Adicionar entrada</button>
+          </div>
+        </form>
+        <div id="income-list">${renderIncomeSchedule(income)}</div>
       </div>
 
       <div class="card">
@@ -98,9 +167,50 @@ const BudgetModule = (() => {
           <p class="muted" id="p-due-hint">Data de vencimento</p>
           <button type="submit" class="btn-primary">Adicionar pagamento</button>
         </form>
-        <div id="payments-list">${renderPayments(payments)}</div>
+
+        <div class="card form-card" style="background:var(--surface-alt); margin-bottom:16px;">
+          <div class="form-row">
+            <select id="f-vendor">
+              <option value="">Todos os fornecedores</option>
+              ${vendors.map(v => `<option value="${v.id}" ${filters.vendorId === v.id ? 'selected' : ''}>${Utils.escapeHtml(v.name)}</option>`).join('')}
+            </select>
+            <select id="f-category">
+              <option value="">Todas as categorias</option>
+              ${items.map(b => b.category).filter((c, i, arr) => arr.indexOf(c) === i).map(c => `<option value="${Utils.escapeHtml(c)}" ${filters.category === c ? 'selected' : ''}>${Utils.escapeHtml(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-row">
+            <select id="f-status">
+              <option value="">Todos os status</option>
+              <option value="pendente" ${filters.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+              <option value="pago" ${filters.status === 'pago' ? 'selected' : ''}>Pago</option>
+            </select>
+            <input type="month" id="f-month" value="${filters.month}" />
+          </div>
+          <div class="form-row">
+            <input type="text" inputmode="decimal" id="f-min" placeholder="Valor mínimo (R$)" value="${filters.minValue}" />
+            <input type="text" inputmode="decimal" id="f-max" placeholder="Valor máximo (R$)" value="${filters.maxValue}" />
+          </div>
+          <button type="button" class="btn-secondary" id="btn-clear-filters">Limpar filtros</button>
+        </div>
+
+        <div id="payments-list">${renderPayments(filtered, vendors, items)}</div>
       </div>
     `;
+  }
+
+  function renderIncomeSchedule(income) {
+    if (!income.length) return `<p class="muted">Nenhuma entrada cadastrada ainda.</p>`;
+    const sorted = [...income].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
+    const total = sorted.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    return `<ul class="simple-list">
+      ${sorted.map(i => `
+        <li data-id="${i.id}">
+          <span>${monthLabel(i.month)} · ${Utils.escapeHtml(i.source)}</span>
+          <span class="muted">${Utils.formatCurrency(i.amount)} <button class="btn-icon btn-delete-income" data-id="${i.id}">Remover</button></span>
+        </li>`).join('')}
+      <li><strong>Total</strong><strong>${Utils.formatCurrency(total)}</strong></li>
+    </ul>`;
   }
 
   function renderBudgetItems(items, vendors) {
@@ -123,10 +233,23 @@ const BudgetModule = (() => {
     </ul>`;
   }
 
-  function renderPayments(payments) {
-    if (!payments.length) return `<p class="muted">Nenhum pagamento cadastrado.</p>`;
-    const today = new Date().setHours(0, 0, 0, 0);
+  function renderPayments(payments, vendors, items) {
+    const total = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const selectedCount = selectedPaymentIds.size;
+    let html = `
+      <div class="bulk-bar${selectedCount ? ' active' : ''}">
+        <span>${payments.length} pagamento(s) · ${Utils.formatCurrency(total)} · ${selectedCount} selecionado(s)</span>
+        <button type="button" class="btn-secondary" id="btn-select-all">Selecionar tudo</button>
+        <button type="button" class="btn-secondary" id="btn-clear-selection" ${selectedCount ? '' : 'disabled'}>Limpar seleção</button>
+        <button type="button" class="btn-danger" id="btn-delete-selected" ${selectedCount ? '' : 'disabled'}>Excluir selecionados</button>
+        <button type="button" class="btn-secondary" id="btn-export-payments">⬇️ Exportar (CSV)</button>
+      </div>`;
 
+    if (!payments.length) {
+      return html + `<p class="muted">Nenhum pagamento encontrado com os filtros atuais.</p>`;
+    }
+
+    const today = new Date().setHours(0, 0, 0, 0);
     const groups = {};
     const noDate = [];
     payments.forEach((p) => {
@@ -136,24 +259,16 @@ const BudgetModule = (() => {
     });
     const sortedKeys = Object.keys(groups).sort();
 
-    const selectedCount = selectedPaymentIds.size;
-    let html = `
-      <div class="bulk-bar${selectedCount ? ' active' : ''}">
-        <span>${selectedCount} selecionado(s)</span>
-        <button type="button" class="btn-secondary" id="btn-clear-selection" ${selectedCount ? '' : 'disabled'}>Limpar seleção</button>
-        <button type="button" class="btn-danger" id="btn-delete-selected" ${selectedCount ? '' : 'disabled'}>Excluir selecionados</button>
-      </div>`;
-
     sortedKeys.forEach((key) => {
-      const items = groups[key].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-      html += renderPaymentGroup(monthLabel(key), items, today);
+      const group = groups[key].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+      html += renderPaymentGroup(monthLabel(key), group, today, vendors, items);
     });
-    if (noDate.length) html += renderPaymentGroup('Sem data definida', noDate, today);
+    if (noDate.length) html += renderPaymentGroup('Sem data definida', noDate, today, vendors, items);
 
     return html;
   }
 
-  function renderPaymentGroup(label, items, today) {
+  function renderPaymentGroup(label, items, today, vendors, budgetItems) {
     const groupTotal = items.reduce((s, p) => s + (Number(p.amount) || 0), 0);
     return `
       <div class="payment-group">
@@ -162,14 +277,16 @@ const BudgetModule = (() => {
           <span class="muted">${Utils.formatCurrency(groupTotal)}</span>
         </div>
         <ul class="data-list">
-          ${items.map((p) => renderPaymentRow(p, today)).join('')}
+          ${items.map((p) => renderPaymentRow(p, today, vendors, budgetItems)).join('')}
         </ul>
       </div>`;
   }
 
-  function renderPaymentRow(p, today) {
+  function renderPaymentRow(p, today, vendors, budgetItems) {
     const isOverdue = p.status !== 'pago' && p.dueDate && new Date(p.dueDate).setHours(0, 0, 0, 0) < today;
     const checked = selectedPaymentIds.has(p.id) ? 'checked' : '';
+    const item = budgetItems ? budgetItems.find((b) => b.id === p.budgetItemId) : null;
+    const vendor = item && vendors ? vendors.find((v) => v.id === item.vendorId) : null;
     return `
       <li data-id="${p.id}">
         <div class="data-list-main">
@@ -178,6 +295,8 @@ const BudgetModule = (() => {
           </label>
           <strong>${Utils.escapeHtml(p.description)}</strong>
           <span class="muted">${Utils.formatCurrency(p.amount)}</span>
+          ${item ? `<span class="tag">${Utils.escapeHtml(item.category)}</span>` : ''}
+          ${vendor ? `<span class="tag">${Utils.escapeHtml(vendor.name)}</span>` : ''}
           ${isOverdue ? '<span class="badge badge-recusado">Atrasado</span>' : ''}
         </div>
         <div class="data-list-sub muted">${p.dueDate ? 'Vencimento: ' + Utils.formatDate(p.dueDate) : 'Sem data'} ${p.paidDate ? '· Pago em ' + Utils.formatDate(p.paidDate) : ''}</div>
@@ -192,6 +311,53 @@ const BudgetModule = (() => {
   }
 
   function afterRender() {
+    document.getElementById('income-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const month = document.getElementById('inc-month').value;
+      const source = document.getElementById('inc-source').value.trim();
+      if (!month || !source) return;
+      Store.addItem('incomeSchedule', {
+        month,
+        source,
+        amount: Utils.parseCurrencyInput(document.getElementById('inc-amount').value),
+      });
+      Utils.toast('Entrada adicionada');
+      App.rerender();
+    });
+
+    document.getElementById('income-list').addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-delete-income')) {
+        Store.removeItem('incomeSchedule', e.target.dataset.id);
+        App.rerender();
+      }
+    });
+
+    const fVendor = document.getElementById('f-vendor');
+    const fCategory = document.getElementById('f-category');
+    const fStatus = document.getElementById('f-status');
+    const fMonth = document.getElementById('f-month');
+    const fMin = document.getElementById('f-min');
+    const fMax = document.getElementById('f-max');
+
+    function onFilterChange() {
+      filters = {
+        vendorId: fVendor.value,
+        category: fCategory.value,
+        status: fStatus.value,
+        month: fMonth.value,
+        minValue: fMin.value,
+        maxValue: fMax.value,
+      };
+      App.rerender();
+    }
+    [fVendor, fCategory, fStatus, fMonth].forEach((el) => el.addEventListener('change', onFilterChange));
+    [fMin, fMax].forEach((el) => el.addEventListener('change', onFilterChange));
+
+    document.getElementById('btn-clear-filters').addEventListener('click', () => {
+      filters = { vendorId: '', category: '', status: '', month: '', minValue: '', maxValue: '' };
+      App.rerender();
+    });
+
     document.getElementById('budget-item-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const category = document.getElementById('bi-category').value.trim();
@@ -287,6 +453,13 @@ const BudgetModule = (() => {
         selectedPaymentIds.delete(e.target.dataset.id);
         App.rerender();
       }
+      if (e.target.id === 'btn-select-all') {
+        const items = Store.get('budgetItems');
+        const vendors = Store.get('vendors');
+        const visible = applyFilters(Store.get('payments'), items, vendors);
+        visible.forEach((p) => selectedPaymentIds.add(p.id));
+        App.rerender();
+      }
       if (e.target.id === 'btn-clear-selection') {
         selectedPaymentIds.clear();
         App.rerender();
@@ -298,6 +471,11 @@ const BudgetModule = (() => {
         selectedPaymentIds.clear();
         Utils.toast(`${count} pagamento(s) removido(s)`);
         App.rerender();
+      }
+      if (e.target.id === 'btn-export-payments') {
+        const items = Store.get('budgetItems');
+        const vendors = Store.get('vendors');
+        exportPaymentsCsv(applyFilters(Store.get('payments'), items, vendors), items, vendors);
       }
     });
 
@@ -321,6 +499,7 @@ const BudgetModule = (() => {
 
   function cleanup() {
     selectedPaymentIds.clear();
+    filters = { vendorId: '', category: '', status: '', month: '', minValue: '', maxValue: '' };
   }
 
   return { render, afterRender, cleanup };
